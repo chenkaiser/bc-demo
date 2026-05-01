@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.4.5</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.example</groupId>
+    <artifactId>bc-demo</artifactId>
+    <version>${revision}</version>
+    <packaging>pom</packaging>
+    <name>bc-demo</name>
+
+    <modules>
+        <module>eureka-server</module>
+        <module>api-gateway</module>
+        <module>greet-service</module>
+        <module>hello-service</module>
+    </modules>
+
+    <properties>
+        <!-- Injected at build time: mvn ... -Drevision=1.2.3  (CI sets this from the git tag) -->
+        <revision>1.0.0</revision>
+        <java.version>21</java.version>
+        <spring-cloud.version>2024.0.1</spring-cloud.version>
+        <logstash-logback-encoder.version>7.4</logstash-logback-encoder.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>net.logstash.logback</groupId>
+                <artifactId>logstash-logback-encoder</artifactId>
+                <version>${logstash-logback-encoder.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <!-- JAR name has no version suffix so Dockerfiles never need updating on release -->
+        <finalName>${project.artifactId}</finalName>
+        <plugins>
+            <!--
+                Writes a .flattened-pom.xml with ${revision} resolved to its actual value.
+                Required so that artifacts installed/deployed to any Maven repository carry
+                a concrete version, not a raw property reference.
+            -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>1.6.0</version>
+                <configuration>
+                    <flattenMode>resolveCiFriendliesOnly</flattenMode>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>flatten</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>flatten</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>flatten.clean</id>
+                        <phase>clean</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

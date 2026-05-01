@@ -1,0 +1,7 @@
+certs/
+target/
+*/target/
+*.class
+.flattened-pom.xml
+*/.flattened-pom.xml
+.claude/settings.local.json

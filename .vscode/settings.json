@@ -1,0 +1,17 @@
+{
+  "files.watcherExclude": {
+    "**/target/**": true,
+    "**/.flattened-pom.xml": true,
+    "**/certs/**": true
+  },
+  "files.exclude": {
+    "**/target": true,
+    "**/.flattened-pom.xml": true
+  },
+  "search.exclude": {
+    "**/target": true
+  },
+  "java.jdt.ls.vmargs": "-XX:+UseG1GC -XX:+UseStringDeduplication -Xmx2G",
+  "java.autobuild.enabled": false,
+  "java.configuration.updateBuildConfiguration": "automatic"
+}

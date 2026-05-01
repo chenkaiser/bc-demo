@@ -1,0 +1,137 @@
+spring:
+  application:
+    name: api-gateway
+
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak:8080/realms/bc-demo}
+
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: 6379
+
+  cloud:
+    gateway:
+      httpclient:
+        connect-timeout: 2000   # ms — TCP handshake limit
+        response-timeout: 10s   # wall-clock limit for the full downstream response
+      routes:
+        - id: greet-service
+          uri: lb://greet-service
+          predicates:
+            - Path=/greet-service/**
+          filters:
+            - StripPrefix=1
+            # 1. Rate limit first — reject over-quota before touching the circuit breaker
+            - name: RequestRateLimiter
+              args:
+                key-resolver: "#{@userKeyResolver}"
+                redis-rate-limiter.replenishRate: 10    # tokens added per second per user
+                redis-rate-limiter.burstCapacity: 20    # max tokens the bucket can hold
+                redis-rate-limiter.requestedTokens: 1   # tokens consumed per request
+            # 2. Circuit break if downstream is unhealthy
+            - name: CircuitBreaker
+              args:
+                name: greet-service-cb
+                fallbackUri: forward:/fallback/greet-service
+            # 3. Retry on transient infra errors (idempotent methods only)
+            - name: Retry
+              args:
+                retries: 2
+                statuses: BAD_GATEWAY,SERVICE_UNAVAILABLE,GATEWAY_TIMEOUT
+                methods: GET,HEAD
+                backoff:
+                  firstBackoff: 100ms
+                  maxBackoff: 1000ms
+                  factor: 2
+                  basedOnPreviousValue: false
+
+        - id: hello-service
+          uri: lb://hello-service
+          predicates:
+            - Path=/hello-service/**
+          filters:
+            - StripPrefix=1
+            - name: RequestRateLimiter
+              args:
+                key-resolver: "#{@userKeyResolver}"
+                redis-rate-limiter.replenishRate: 10
+                redis-rate-limiter.burstCapacity: 20
+                redis-rate-limiter.requestedTokens: 1
+            - name: CircuitBreaker
+              args:
+                name: hello-service-cb
+                fallbackUri: forward:/fallback/hello-service
+            - name: Retry
+              args:
+                retries: 2
+                statuses: BAD_GATEWAY,SERVICE_UNAVAILABLE,GATEWAY_TIMEOUT
+                methods: GET,HEAD
+                backoff:
+                  firstBackoff: 100ms
+                  maxBackoff: 1000ms
+                  factor: 2
+                  basedOnPreviousValue: false
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      greet-service-cb:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        failure-rate-threshold: 50          # open after 50% failures in the window
+        slow-call-duration-threshold: 5s    # calls taking longer count as failures
+        slow-call-rate-threshold: 80
+        wait-duration-in-open-state: 30s    # stay open for 30s before probing
+        permitted-number-of-calls-in-half-open-state: 3
+        register-health-indicator: true
+      hello-service-cb:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        slow-call-duration-threshold: 5s
+        slow-call-rate-threshold: 80
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        register-health-indicator: true
+
+server:
+  port: 8443
+  shutdown: graceful
+  ssl:
+    enabled: true
+    key-store: ${SSL_KEY_STORE:/app/certs/keystore.p12}
+    key-store-password: ${SSL_KEY_STORE_PASSWORD:changeit}
+    key-store-type: PKCS12
+    key-alias: gateway
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://tempo:4318}/v1/traces
+
+logging:
+  level:
+    root: INFO
+    com.example: INFO

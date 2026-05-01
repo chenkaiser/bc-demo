@@ -1,0 +1,29 @@
+name: PR title lint
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  lint:
+    name: Conventional Commits title
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Allowed types — keep this in sync with the release workflow's bump rules.
+          # feat  → minor bump   fix/perf → patch bump   BREAKING CHANGE footer → major
+          # chore/docs/ci/refactor/test/build → no release (default_bump: false in release.yml)
+          types: |
+            feat
+            fix
+            perf
+            chore
+            docs
+            ci
+            refactor
+            test
+            build
+          requireScope: false

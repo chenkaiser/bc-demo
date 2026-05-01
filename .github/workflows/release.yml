@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  release:
+    name: Tag & publish release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # create tags and GitHub Releases
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history so tag-action can read all commits
+
+      # Compute next semver from Conventional Commits since the last tag.
+      # feat → minor bump, fix/perf → patch bump, BREAKING CHANGE footer → major bump.
+      # default_bump: false means chore/docs/ci/refactor commits do NOT produce a release.
+      - name: Compute next version
+        id: tag
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          default_bump: false
+          tag_prefix: v
+
+      # If no bumpable commit was found, the action sets new_tag to the existing tag.
+      # We skip the rest of the job so we don't publish a duplicate release.
+      - name: Skip if no version bump
+        if: steps.tag.outputs.new_tag == steps.tag.outputs.previous_tag
+        run: |
+          echo "No releasable commits since ${{ steps.tag.outputs.previous_tag }} — skipping."
+
+      - name: Set up Java
+        if: steps.tag.outputs.new_tag != steps.tag.outputs.previous_tag
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: temurin
+          cache: maven
+
+      # Strip the leading 'v' so Maven gets a plain semver like 1.2.3.
+      - name: Verify build at new version
+        if: steps.tag.outputs.new_tag != steps.tag.outputs.previous_tag
+        run: |
+          VERSION="${{ steps.tag.outputs.new_version }}"
+          mvn verify -Drevision=${VERSION} --batch-mode -q
+
+      - name: Create GitHub Release
+        if: steps.tag.outputs.new_tag != steps.tag.outputs.previous_tag
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.tag.outputs.new_tag }}
+          release_name: ${{ steps.tag.outputs.new_tag }}
+          body: ${{ steps.tag.outputs.changelog }}
+          draft: false
+          prerelease: false

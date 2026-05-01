@@ -1,0 +1,28 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: eureka-server
+    static_configs:
+      - targets: ['eureka-server:8761']
+    metrics_path: /actuator/prometheus
+
+  - job_name: greet-service
+    static_configs:
+      - targets: ['greet-service:8081']
+    metrics_path: /actuator/prometheus
+
+  - job_name: hello-service
+    static_configs:
+      - targets: ['hello-service:8080']
+    metrics_path: /actuator/prometheus
+
+  # gateway serves HTTPS with a self-signed cert
+  - job_name: api-gateway
+    scheme: https
+    tls_config:
+      insecure_skip_verify: true
+    static_configs:
+      - targets: ['api-gateway:8443']
+    metrics_path: /actuator/prometheus
