@@ -1,0 +1,116 @@
+# Production overlay: 2 replicas, graceful shutdown, persistent volumes,
+#                     HTTPS gateway, full observability stack.
+# Usage: podman compose -f compose.yml -f compose.prod.yml up --build
+# Prerequisite: bash scripts/generate-certs.sh
+
+services:
+
+  keycloak:
+    stop_grace_period: 15s
+
+  eureka-server:
+    stop_grace_period: 35s
+
+  greet-service:
+    deploy:
+      replicas: 2
+    stop_grace_period: 35s
+
+  hello-service:
+    deploy:
+      replicas: 2
+    stop_grace_period: 35s
+
+  redis:
+    volumes:
+      - redis-data:/data
+    stop_grace_period: 10s
+
+  # ── API Gateway (HTTPS) ─────────────────────────────────────────────────────
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+      args:
+        APP_VERSION: ${APP_VERSION:-local}
+    ports:
+      - "8443:8443"
+    volumes:
+      - ./certs:/app/certs:ro
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - KEYCLOAK_ISSUER_URI=http://keycloak:8080/realms/bc-demo
+      - REDIS_HOST=redis
+    networks:
+      - app-net
+    stop_grace_period: 35s
+    depends_on:
+      redis:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+      greet-service:
+        condition: service_healthy
+      hello-service:
+        condition: service_healthy
+
+  # ── Observability stack ─────────────────────────────────────────────────────
+
+  tempo:
+    image: docker.io/grafana/tempo:2.7.1
+    command: ["-config.file=/etc/tempo.yml"]
+    volumes:
+      - ./observability/tempo.yml:/etc/tempo.yml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - "3200:3200"
+      - "4317:4317"
+      - "4318:4318"
+    networks:
+      - app-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3200/ready | grep -q ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  prometheus:
+    image: docker.io/prom/prometheus:v3.3.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - app-net
+
+  grafana:
+    image: docker.io/grafana/grafana:11.6.1
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    volumes:
+      - ./observability/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - grafana-data:/var/lib/grafana
+    networks:
+      - app-net
+    depends_on:
+      - prometheus
+      - tempo
+
+volumes:
+  redis-data:
+  tempo-data:
+  prometheus-data:
+  grafana-data:

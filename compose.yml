@@ -1,3 +1,11 @@
+# Base configuration shared across all environments.
+# Do not use this file directly — always combine with an environment overlay:
+#
+#   prod:  podman compose -f compose.yml -f compose.prod.yml up --build
+#   dev:   podman compose -f compose.yml -f compose.dev.yml up --build
+#   infra: podman compose -f compose.yml -f compose.infra.yml up --build
+#          then locally: mvn spring-boot:run -pl api-gateway -Dspring-boot.run.profiles=local
+
 services:
 
   # ── Identity ────────────────────────────────────────────────────────────────
@@ -15,8 +23,7 @@ services:
     ports:
       - "8080:8080"
     networks:
-      - spring-cloud-net
-    stop_grace_period: 15s
+      - app-net
     healthcheck:
       test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && printf 'GET /health/ready HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && grep -qm1 UP <&3"]
       interval: 15s
@@ -35,8 +42,7 @@ services:
     ports:
       - "8761:8761"
     networks:
-      - spring-cloud-net
-    stop_grace_period: 35s
+      - app-net
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8761/eureka/apps"]
       interval: 15s
@@ -52,16 +58,13 @@ services:
       dockerfile: greet-service/Dockerfile
       args:
         APP_VERSION: ${APP_VERSION:-local}
-    deploy:
-      replicas: 2
     environment:
       - SPRING_APPLICATION_NAME=greet-service
       - SERVER_PORT=8081
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
       - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
     networks:
-      - spring-cloud-net
-    stop_grace_period: 35s
+      - app-net
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -78,16 +81,13 @@ services:
       dockerfile: hello-service/Dockerfile
       args:
         APP_VERSION: ${APP_VERSION:-local}
-    deploy:
-      replicas: 2
     environment:
       - SPRING_APPLICATION_NAME=hello-service
       - SERVER_PORT=8080
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
       - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
     networks:
-      - spring-cloud-net
-    stop_grace_period: 35s
+      - app-net
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -105,106 +105,14 @@ services:
     command: redis-server --appendonly yes
     ports:
       - "6379:6379"
-    volumes:
-      - redis-data:/data
     networks:
-      - spring-cloud-net
-    stop_grace_period: 10s
+      - app-net
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 3s
       retries: 5
 
-  # ── API Gateway ─────────────────────────────────────────────────────────────
-
-  api-gateway:
-    build:
-      context: .
-      dockerfile: api-gateway/Dockerfile
-      args:
-        APP_VERSION: ${APP_VERSION:-local}
-    ports:
-      - "8443:8443"
-    volumes:
-      - ./certs:/app/certs:ro
-    environment:
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
-      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
-      - KEYCLOAK_ISSUER_URI=http://keycloak:8080/realms/bc-demo
-      - REDIS_HOST=redis
-    networks:
-      - spring-cloud-net
-    stop_grace_period: 35s
-    depends_on:
-      redis:
-        condition: service_healthy
-      keycloak:
-        condition: service_healthy
-      eureka-server:
-        condition: service_healthy
-      greet-service:
-        condition: service_healthy
-      hello-service:
-        condition: service_healthy
-
-  # ── Observability stack ─────────────────────────────────────────────────────
-
-  tempo:
-    image: docker.io/grafana/tempo:2.7.1
-    command: ["-config.file=/etc/tempo.yml"]
-    volumes:
-      - ./observability/tempo.yml:/etc/tempo.yml:ro
-      - tempo-data:/var/tempo
-    ports:
-      - "3200:3200"
-      - "4317:4317"
-      - "4318:4318"
-    networks:
-      - spring-cloud-net
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3200/ready | grep -q ready"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
-
-  prometheus:
-    image: docker.io/prom/prometheus:v3.3.1
-    command:
-      - --config.file=/etc/prometheus/prometheus.yml
-      - --storage.tsdb.retention.time=7d
-    volumes:
-      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus-data:/prometheus
-    ports:
-      - "9090:9090"
-    networks:
-      - spring-cloud-net
-
-  grafana:
-    image: docker.io/grafana/grafana:11.6.1
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_AUTH_ANONYMOUS_ENABLED=false
-    volumes:
-      - ./observability/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
-      - grafana-data:/var/lib/grafana
-    networks:
-      - spring-cloud-net
-    depends_on:
-      - prometheus
-      - tempo
-
 networks:
-  spring-cloud-net:
+  app-net:
     driver: bridge
-
-volumes:
-  tempo-data:
-  prometheus-data:
-  grafana-data:
-  redis-data:

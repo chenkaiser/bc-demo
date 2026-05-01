@@ -1,0 +1,23 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // Workflow 1: attach to gateway running inside Podman (compose.dev.yml + compose.debug.yml)
+      "type": "java",
+      "name": "Attach: Gateway in Podman",
+      "request": "attach",
+      "hostName": "localhost",
+      "port": 5005,
+      "projectName": "api-gateway"
+    },
+    {
+      // Workflow 2: run gateway locally against infra in Podman (compose.infra.yml)
+      "type": "java",
+      "name": "Run: Gateway local (HTTP :8888)",
+      "request": "launch",
+      "mainClass": "com.example.gateway.ApiGatewayApplication",
+      "projectName": "api-gateway",
+      "vmArgs": "-Dspring.profiles.active=local"
+    }
+  ]
+}

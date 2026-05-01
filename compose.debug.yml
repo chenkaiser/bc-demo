@@ -1,0 +1,14 @@
+# Debug overlay: exposes JDWP on port 5005 for remote debugger attachment.
+# Layer on top of compose.dev.yml:
+#
+# Usage: podman compose -f compose.yml -f compose.dev.yml -f compose.debug.yml up --build
+# Then:  attach debugger to localhost:5005
+#
+# To break on startup (e.g. to debug bean wiring), change suspend=n to suspend=y.
+
+services:
+  api-gateway:
+    environment:
+      - JAVA_TOOL_OPTIONS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
+    ports:
+      - "5005:5005"
