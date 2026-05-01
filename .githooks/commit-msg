@@ -1,0 +1,23 @@
+#!/bin/sh
+# Enforce Conventional Commits format: type(scope): description
+# Types that trigger a release: feat, fix, perf
+# Types that do not: chore, docs, ci, refactor, test, build, revert
+
+MSG=$(cat "$1")
+
+PATTERN='^(feat|fix|perf|chore|docs|ci|refactor|test|build|revert)(\(.+\))!?: .+'
+
+if ! echo "$MSG" | grep -qE "$PATTERN"; then
+  echo ""
+  echo "  Commit message does not follow Conventional Commits format."
+  echo ""
+  echo "  Expected: <type>[(<scope>)][!]: <description>"
+  echo "  Example:  feat(auth): add JWT refresh support"
+  echo "            fix: handle null response from Keycloak"
+  echo "            chore: update dependencies"
+  echo ""
+  echo "  Allowed types: feat, fix, perf, chore, docs, ci, refactor, test, build, revert"
+  echo "  Append ! after type/scope for a breaking change: feat!: ..."
+  echo ""
+  exit 1
+fi
