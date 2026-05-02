@@ -9,6 +9,12 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - dependencies
+    ignore:
+      # Major version bumps for Spring Boot and Spring Cloud require deliberate migration work
+      - dependency-name: "org.springframework.boot:spring-boot-starter-parent"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "org.springframework.cloud:spring-cloud-dependencies"
+        update-types: ["version-update:semver-major"]
 
   # Keep GitHub Actions versions current
   - package-ecosystem: github-actions
