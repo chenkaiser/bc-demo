@@ -81,6 +81,18 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <configuration>
+                    <!-- Exclude Spring bootstrap and pure @Configuration beans — no testable logic -->
+                    <excludes>
+                        <exclude>com/example/gateway/ApiGatewayApplication.class</exclude>
+                        <exclude>com/example/gateway/SecurityConfig.class</exclude>
+                        <exclude>com/example/gateway/RateLimiterConfig.class</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 </project>
