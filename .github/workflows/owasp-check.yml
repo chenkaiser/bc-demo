@@ -27,7 +27,7 @@ jobs:
 
       # Cache the NVD database so subsequent weekly runs skip the slow download
       - name: Cache NVD database
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.owasp
           key: owasp-nvd-${{ github.run_id }}
