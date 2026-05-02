@@ -1,15 +1,18 @@
 FROM docker.io/library/maven:3.9-eclipse-temurin-21 AS build
 ARG APP_VERSION=local
 WORKDIR /app
+
+# Install the parent POM into the local cache — non-recursive, no sibling modules needed.
+# Adding a new service to the repo never requires touching this file.
 COPY pom.xml .
-COPY eureka-server/pom.xml eureka-server/
-COPY api-gateway/pom.xml api-gateway/
-COPY greet-service/pom.xml greet-service/
-COPY hello-service/pom.xml hello-service/
-RUN mvn dependency:go-offline -pl hello-service -am -Drevision=${APP_VERSION} -q
+RUN mvn install -N -Drevision=${APP_VERSION} -q
+
+COPY hello-service/pom.xml hello-service/pom.xml
+RUN mvn dependency:go-offline -f hello-service/pom.xml -Drevision=${APP_VERSION} -q
+
 COPY hello-service/src hello-service/src
-RUN mvn test -pl hello-service -Drevision=${APP_VERSION} -q
-RUN mvn package -pl hello-service -DskipTests -Drevision=${APP_VERSION} -q
+RUN mvn test -f hello-service/pom.xml -Drevision=${APP_VERSION} -q
+RUN mvn package -f hello-service/pom.xml -DskipTests -Drevision=${APP_VERSION} -q
 
 FROM docker.io/library/eclipse-temurin:21-jre
 WORKDIR /app
