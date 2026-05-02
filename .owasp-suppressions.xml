@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+    <!--
+        Add suppressions here for false positives or accepted risks.
+        Example:
+        <suppress>
+            <notes>False positive — this CVE affects the C library, not the Java binding.</notes>
+            <cve>CVE-2023-XXXXX</cve>
+        </suppress>
+    -->
+</suppressions>

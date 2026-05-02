@@ -13,6 +13,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history needed for SonarCloud blame info
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -21,5 +23,22 @@ jobs:
           distribution: temurin
           cache: maven
 
-      - name: Build and test
+      # Runs: compile → test (with JaCoCo agent) → SpotBugs check → JaCoCo report
+      - name: Build, test and analyse
         run: mvn verify --batch-mode -q
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-reports
+          path: '**/target/site/jacoco/'
+          retention-days: 7
+
+      # Requires SONAR_TOKEN secret — see docs/quality-gates.md for setup.
+      - name: SonarCloud analysis
+        if: ${{ secrets.SONAR_TOKEN != '' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: mvn sonar:sonar --batch-mode -q

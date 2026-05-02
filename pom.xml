@@ -30,6 +30,19 @@
         <java.version>21</java.version>
         <spring-cloud.version>2024.0.1</spring-cloud.version>
         <logstash-logback-encoder.version>7.4</logstash-logback-encoder.version>
+
+        <!-- Quality tooling versions -->
+        <jacoco.version>0.8.12</jacoco.version>
+        <spotbugs-maven-plugin.version>4.9.3.0</spotbugs-maven-plugin.version>
+
+        <!-- SonarCloud — read by mvn sonar:sonar in CI -->
+        <sonar.projectKey>chenkaiser_bc-demo</sonar.projectKey>
+        <sonar.organization>chenkaiser</sonar.organization>
+        <sonar.host.url>https://sonarcloud.io</sonar.host.url>
+        <!-- Collect JaCoCo reports from every module -->
+        <sonar.coverage.jacoco.xmlReportPaths>
+            ${project.basedir}/../*/target/site/jacoco/jacoco.xml
+        </sonar.coverage.jacoco.xmlReportPaths>
     </properties>
 
     <dependencyManagement>
@@ -48,6 +61,21 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
+
+    <profiles>
+        <!-- SpotBugs and JaCoCo both embed ASM which cannot parse JDK 25 class files.
+             Auto-skip both tools locally when running JDK 25+; CI always uses JDK 21. -->
+        <profile>
+            <id>quality-skip-jdk25plus</id>
+            <activation>
+                <jdk>[25,)</jdk>
+            </activation>
+            <properties>
+                <spotbugs.skip>true</spotbugs.skip>
+                <jacoco.skip>true</jacoco.skip>
+            </properties>
+        </profile>
+    </profiles>
 
     <build>
         <!-- JAR name has no version suffix so Dockerfiles never need updating on release -->
@@ -79,6 +107,49 @@
                         <goals>
                             <goal>clean</goal>
                         </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!--
+                JaCoCo: instruments the JVM before Surefire runs (prepare-agent),
+                then generates XML + HTML coverage reports per module (report).
+                XML is consumed by SonarCloud; HTML is uploaded as a CI artifact.
+            -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals><goal>prepare-agent</goal></goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>verify</phase>
+                        <goals><goal>report</goal></goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!--
+                SpotBugs: static bytecode analysis — fails the build on HIGH severity
+                bugs (e.g. null-dereference, bad equals, resource leaks).
+                Suppress false positives with @SuppressFBWarnings("CATEGORY") on the class.
+            -->
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>${spotbugs-maven-plugin.version}</version>
+                <configuration>
+                    <effort>Default</effort>
+                    <threshold>High</threshold>
+                    <failOnError>true</failOnError>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals><goal>check</goal></goals>
                     </execution>
                 </executions>
             </plugin>
