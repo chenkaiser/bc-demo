@@ -32,7 +32,7 @@
         <logstash-logback-encoder.version>7.4</logstash-logback-encoder.version>
 
         <!-- Quality tooling versions -->
-        <jacoco.version>0.8.12</jacoco.version>
+        <jacoco.version>0.8.14</jacoco.version>
         <spotbugs-maven-plugin.version>4.9.3.0</spotbugs-maven-plugin.version>
 
         <!-- SonarCloud — read by mvn sonar:sonar in CI -->
