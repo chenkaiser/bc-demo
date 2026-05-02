@@ -5,27 +5,53 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.example</groupId>
-        <artifactId>bc-demo</artifactId>
-        <version>${revision}</version>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.4.5</version>
+        <relativePath/>
     </parent>
 
+    <groupId>com.example</groupId>
     <artifactId>api-gateway</artifactId>
+    <version>${revision}</version>
     <name>api-gateway</name>
     <description>Spring Cloud API Gateway</description>
 
+    <properties>
+        <revision>1.0.0</revision>
+        <java.version>21</java.version>
+        <spring-cloud.version>2024.0.1</spring-cloud.version>
+        <logstash-logback-encoder.version>7.4</logstash-logback-encoder.version>
+        <jacoco.version>0.8.14</jacoco.version>
+        <spotbugs-maven-plugin.version>4.9.3.0</spotbugs-maven-plugin.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>net.logstash.logback</groupId>
+                <artifactId>logstash-logback-encoder</artifactId>
+                <version>${logstash-logback-encoder.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
-        <!-- Reactive gateway (WebFlux-based) -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-gateway</artifactId>
         </dependency>
-        <!-- Eureka client for service discovery -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
         </dependency>
-        <!-- JWT validation at the gateway -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
@@ -34,27 +60,22 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
-        <!-- Health, metrics, and info endpoints -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
-        <!-- Redis-backed token-bucket rate limiter -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
         </dependency>
-        <!-- Circuit breaker -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-circuitbreaker-reactor-resilience4j</artifactId>
         </dependency>
-        <!-- Metrics -->
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>
         </dependency>
-        <!-- Distributed tracing -->
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-tracing-bridge-otel</artifactId>
@@ -63,7 +84,6 @@
             <groupId>io.opentelemetry</groupId>
             <artifactId>opentelemetry-exporter-otlp</artifactId>
         </dependency>
-        <!-- Structured JSON logging -->
         <dependency>
             <groupId>net.logstash.logback</groupId>
             <artifactId>logstash-logback-encoder</artifactId>
@@ -75,23 +95,79 @@
         </dependency>
     </dependencies>
 
+    <profiles>
+        <profile>
+            <id>quality-skip-jdk25plus</id>
+            <activation><jdk>[25,)</jdk></activation>
+            <properties>
+                <spotbugs.skip>true</spotbugs.skip>
+                <jacoco.skip>true</jacoco.skip>
+            </properties>
+        </profile>
+    </profiles>
+
     <build>
+        <finalName>${project.artifactId}</finalName>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
             <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>1.7.3</version>
+                <configuration><flattenMode>resolveCiFriendliesOnly</flattenMode></configuration>
+                <executions>
+                    <execution><id>flatten</id><phase>process-resources</phase><goals><goal>flatten</goal></goals></execution>
+                    <execution><id>flatten.clean</id><phase>clean</phase><goals><goal>clean</goal></goals></execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
                 <configuration>
-                    <!-- Exclude Spring bootstrap and pure @Configuration beans — no testable logic -->
                     <excludes>
                         <exclude>com/example/gateway/ApiGatewayApplication.class</exclude>
                         <exclude>com/example/gateway/SecurityConfig.class</exclude>
                         <exclude>com/example/gateway/RateLimiterConfig.class</exclude>
                     </excludes>
                 </configuration>
+                <executions>
+                    <execution><id>prepare-agent</id><goals><goal>prepare-agent</goal></goals></execution>
+                    <execution><id>report</id><phase>verify</phase><goals><goal>report</goal></goals></execution>
+                    <execution>
+                        <id>check</id><goals><goal>check</goal></goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.80</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>${spotbugs-maven-plugin.version}</version>
+                <configuration>
+                    <effort>Default</effort>
+                    <threshold>High</threshold>
+                    <failOnError>true</failOnError>
+                </configuration>
+                <executions>
+                    <execution><goals><goal>check</goal></goals></execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

@@ -35,8 +35,8 @@ services:
 
   eureka-server:
     build:
-      context: .
-      dockerfile: eureka-server/Dockerfile
+      context: ./eureka-server
+      dockerfile: Dockerfile
       args:
         APP_VERSION: ${APP_VERSION:-local}
     ports:
@@ -54,8 +54,8 @@ services:
 
   greet-service:
     build:
-      context: .
-      dockerfile: greet-service/Dockerfile
+      context: ./greet-service
+      dockerfile: Dockerfile
       args:
         APP_VERSION: ${APP_VERSION:-local}
     environment:
@@ -77,8 +77,8 @@ services:
 
   hello-service:
     build:
-      context: .
-      dockerfile: hello-service/Dockerfile
+      context: ./hello-service
+      dockerfile: Dockerfile
       args:
         APP_VERSION: ${APP_VERSION:-local}
     environment:

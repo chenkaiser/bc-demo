@@ -4,19 +4,17 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.4.5</version>
-        <relativePath/>
-    </parent>
-
     <groupId>com.example</groupId>
     <artifactId>bc-demo</artifactId>
-    <version>${revision}</version>
+    <version>1.0.0</version>
     <packaging>pom</packaging>
     <name>bc-demo</name>
 
+    <!--
+        Pure aggregator — not a parent. Services inherit from spring-boot-starter-parent
+        directly so each can be built and moved to its own repo without changes.
+        This file exists only for convenience: "mvn verify" from the repo root builds all.
+    -->
     <modules>
         <module>eureka-server</module>
         <module>api-gateway</module>
@@ -25,153 +23,13 @@
     </modules>
 
     <properties>
-        <!-- Injected at build time: mvn ... -Drevision=1.2.3  (CI sets this from the git tag) -->
-        <revision>1.0.0</revision>
-        <java.version>21</java.version>
-        <spring-cloud.version>2024.0.1</spring-cloud.version>
-        <logstash-logback-encoder.version>7.4</logstash-logback-encoder.version>
-
-        <!-- Quality tooling versions -->
-        <jacoco.version>0.8.14</jacoco.version>
-        <spotbugs-maven-plugin.version>4.9.3.0</spotbugs-maven-plugin.version>
-
-        <!-- SonarCloud — read by mvn sonar:sonar in CI -->
+        <!-- SonarCloud — read by "mvn sonar:sonar" in CI when run from repo root -->
         <sonar.projectKey>chenkaiser_bc-demo</sonar.projectKey>
         <sonar.organization>chenkaiser</sonar.organization>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
-        <!-- Collect JaCoCo reports from every module -->
         <sonar.coverage.jacoco.xmlReportPaths>
             ${project.basedir}/../*/target/site/jacoco/jacoco.xml
         </sonar.coverage.jacoco.xmlReportPaths>
     </properties>
 
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>org.springframework.cloud</groupId>
-                <artifactId>spring-cloud-dependencies</artifactId>
-                <version>${spring-cloud.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <dependency>
-                <groupId>net.logstash.logback</groupId>
-                <artifactId>logstash-logback-encoder</artifactId>
-                <version>${logstash-logback-encoder.version}</version>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
-
-    <profiles>
-        <!-- SpotBugs and JaCoCo both embed ASM which cannot parse JDK 25 class files.
-             Auto-skip both tools locally when running JDK 25+; CI always uses JDK 21. -->
-        <profile>
-            <id>quality-skip-jdk25plus</id>
-            <activation>
-                <jdk>[25,)</jdk>
-            </activation>
-            <properties>
-                <spotbugs.skip>true</spotbugs.skip>
-                <jacoco.skip>true</jacoco.skip>
-            </properties>
-        </profile>
-    </profiles>
-
-    <build>
-        <!-- JAR name has no version suffix so Dockerfiles never need updating on release -->
-        <finalName>${project.artifactId}</finalName>
-        <plugins>
-            <!--
-                Writes a .flattened-pom.xml with ${revision} resolved to its actual value.
-                Required so that artifacts installed/deployed to any Maven repository carry
-                a concrete version, not a raw property reference.
-            -->
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>flatten-maven-plugin</artifactId>
-                <version>1.7.3</version>
-                <configuration>
-                    <flattenMode>resolveCiFriendliesOnly</flattenMode>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>flatten</id>
-                        <phase>process-resources</phase>
-                        <goals>
-                            <goal>flatten</goal>
-                        </goals>
-                    </execution>
-                    <execution>
-                        <id>flatten.clean</id>
-                        <phase>clean</phase>
-                        <goals>
-                            <goal>clean</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <!--
-                JaCoCo: instruments the JVM before Surefire runs (prepare-agent),
-                then generates XML + HTML coverage reports per module (report).
-                XML is consumed by SonarCloud; HTML is uploaded as a CI artifact.
-            -->
-            <plugin>
-                <groupId>org.jacoco</groupId>
-                <artifactId>jacoco-maven-plugin</artifactId>
-                <version>${jacoco.version}</version>
-                <executions>
-                    <execution>
-                        <id>prepare-agent</id>
-                        <goals><goal>prepare-agent</goal></goals>
-                    </execution>
-                    <execution>
-                        <id>report</id>
-                        <phase>verify</phase>
-                        <goals><goal>report</goal></goals>
-                    </execution>
-                    <execution>
-                        <id>check</id>
-                        <phase>verify</phase>
-                        <goals><goal>check</goal></goals>
-                        <configuration>
-                            <rules>
-                                <rule>
-                                    <element>BUNDLE</element>
-                                    <limits>
-                                        <limit>
-                                            <counter>INSTRUCTION</counter>
-                                            <value>COVEREDRATIO</value>
-                                            <minimum>0.80</minimum>
-                                        </limit>
-                                    </limits>
-                                </rule>
-                            </rules>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <!--
-                SpotBugs: static bytecode analysis — fails the build on HIGH severity
-                bugs (e.g. null-dereference, bad equals, resource leaks).
-                Suppress false positives with @SuppressFBWarnings("CATEGORY") on the class.
-            -->
-            <plugin>
-                <groupId>com.github.spotbugs</groupId>
-                <artifactId>spotbugs-maven-plugin</artifactId>
-                <version>${spotbugs-maven-plugin.version}</version>
-                <configuration>
-                    <effort>Default</effort>
-                    <threshold>High</threshold>
-                    <failOnError>true</failOnError>
-                </configuration>
-                <executions>
-                    <execution>
-                        <goals><goal>check</goal></goals>
-                    </execution>
-                </executions>
-            </plugin>
-        </plugins>
-    </build>
 </project>

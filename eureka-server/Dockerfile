@@ -1,22 +1,15 @@
 FROM docker.io/library/maven:3.9-eclipse-temurin-21 AS build
 ARG APP_VERSION=local
 WORKDIR /app
-
-# Install the parent POM into the local cache — non-recursive, no sibling modules needed.
-# Adding a new service to the repo never requires touching this file.
 COPY pom.xml .
-RUN mvn install -N -Drevision=${APP_VERSION} -q
-
-COPY eureka-server/pom.xml eureka-server/pom.xml
-RUN mvn dependency:go-offline -f eureka-server/pom.xml -Drevision=${APP_VERSION} -q
-
-COPY eureka-server/src eureka-server/src
-RUN mvn test -f eureka-server/pom.xml -Drevision=${APP_VERSION} -q
-RUN mvn package -f eureka-server/pom.xml -DskipTests -Drevision=${APP_VERSION} -q
+RUN mvn dependency:go-offline -Drevision=${APP_VERSION} -q
+COPY src src
+RUN mvn test -Drevision=${APP_VERSION} -q
+RUN mvn package -DskipTests -Drevision=${APP_VERSION} -q
 
 FROM docker.io/library/eclipse-temurin:21-jre
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
-COPY --from=build /app/eureka-server/target/eureka-server.jar app.jar
+COPY --from=build /app/target/eureka-server.jar app.jar
 EXPOSE 8761
 ENTRYPOINT ["java", "-jar", "app.jar"]

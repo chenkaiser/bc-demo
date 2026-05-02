@@ -5,14 +5,43 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.example</groupId>
-        <artifactId>bc-demo</artifactId>
-        <version>${revision}</version>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.4.5</version>
+        <relativePath/>
     </parent>
 
+    <groupId>com.example</groupId>
     <artifactId>hello-service</artifactId>
+    <version>${revision}</version>
     <name>hello-service</name>
     <description>Simple Hello World REST API</description>
+
+    <properties>
+        <revision>1.0.0</revision>
+        <java.version>21</java.version>
+        <spring-cloud.version>2024.0.1</spring-cloud.version>
+        <logstash-logback-encoder.version>7.4</logstash-logback-encoder.version>
+        <jacoco.version>0.8.14</jacoco.version>
+        <spotbugs-maven-plugin.version>4.9.3.0</spotbugs-maven-plugin.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>net.logstash.logback</groupId>
+                <artifactId>logstash-logback-encoder</artifactId>
+                <version>${logstash-logback-encoder.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <dependency>
@@ -50,26 +79,48 @@
         </dependency>
     </dependencies>
 
+    <profiles>
+        <profile>
+            <id>quality-skip-jdk25plus</id>
+            <activation><jdk>[25,)</jdk></activation>
+            <properties>
+                <spotbugs.skip>true</spotbugs.skip>
+                <jacoco.skip>true</jacoco.skip>
+            </properties>
+        </profile>
+    </profiles>
+
     <build>
+        <finalName>${project.artifactId}</finalName>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
             <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>1.7.3</version>
+                <configuration><flattenMode>resolveCiFriendliesOnly</flattenMode></configuration>
+                <executions>
+                    <execution><id>flatten</id><phase>process-resources</phase><goals><goal>flatten</goal></goals></execution>
+                    <execution><id>flatten.clean</id><phase>clean</phase><goals><goal>clean</goal></goals></execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
                 <configuration>
                     <excludes>
                         <exclude>com/example/helloservice/HelloServiceApplication.class</exclude>
                     </excludes>
                 </configuration>
                 <executions>
-                    <!-- Lower threshold: same reason as greet-service — GlobalExceptionHandler
-                         has handlers for exceptions the current controller cannot produce. -->
+                    <execution><id>prepare-agent</id><goals><goal>prepare-agent</goal></goals></execution>
+                    <execution><id>report</id><phase>verify</phase><goals><goal>report</goal></goals></execution>
                     <execution>
-                        <id>check</id>
-                        <goals><goal>check</goal></goals>
+                        <id>check</id><goals><goal>check</goal></goals>
                         <configuration>
                             <rules>
                                 <rule>
@@ -85,6 +136,19 @@
                             </rules>
                         </configuration>
                     </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>${spotbugs-maven-plugin.version}</version>
+                <configuration>
+                    <effort>Default</effort>
+                    <threshold>High</threshold>
+                    <failOnError>true</failOnError>
+                </configuration>
+                <executions>
+                    <execution><goals><goal>check</goal></goals></execution>
                 </executions>
             </plugin>
         </plugins>

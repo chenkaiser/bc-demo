@@ -30,8 +30,8 @@ services:
 
   api-gateway:
     build:
-      context: .
-      dockerfile: api-gateway/Dockerfile
+      context: ./api-gateway
+      dockerfile: Dockerfile
       args:
         APP_VERSION: ${APP_VERSION:-local}
     ports:
