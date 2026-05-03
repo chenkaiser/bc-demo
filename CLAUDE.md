@@ -38,10 +38,18 @@ echo "127.0.0.1  keycloak" | sudo tee -a /etc/hosts
 **Start the stack:**
 
 ```bash
-podman compose up --build
-# or with a specific version baked into the images:
-APP_VERSION=1.2.3 podman compose up --build
+# Dev (HTTP :8888, no TLS, no observability)
+bash scripts/dev.sh up --build
+
+# Production (HTTPS :8443, 2 replicas, observability) — requires generate-certs.sh first
+bash scripts/prod.sh up --build
+
+# With a specific version baked into the images:
+APP_VERSION=1.2.3 bash scripts/prod.sh up --build
 ```
+
+> `podman compose -f a.yml -f b.yml` is broken in podman-compose ≤ 1.0.6.
+> The scripts use `COMPOSE_FILE=a.yml:b.yml podman-compose` which works correctly.
 
 **Get a token and call the gateway:**
 
